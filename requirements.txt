@@ -1,0 +1,7 @@
+cohere>=7.1.0
+mistralai>=1.0.0
+streamlit==1.57.0
+pypdfium2>=4.30.0
+pillow>=10.0.0
+python-docx>=1.1.0
+requests>=2.31.0

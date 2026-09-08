@@ -1,0 +1,38 @@
+# Environment / secrets
+.env
+*.env
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Output / scratch
+out/
+out_test/
+output_example/
+temp/
+vault_out/
+*_parsed.json
+
+# Test artifacts
+test_*.md
+test_*.pdf
+test_*.docx
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
