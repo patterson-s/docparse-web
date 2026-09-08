@@ -19,7 +19,9 @@ from __future__ import annotations
 
 import base64
 import json
+import random
 import re
+import time
 from typing import Optional
 
 from .base import ChatProvider, OcrProvider, DocumentSource, ProviderError
@@ -336,6 +338,7 @@ class CohereParseOcrProvider(OcrProvider):
                     raise ProviderError(
                         f"Cohere Parse OCR failed after retries: {last_exc}"
                     ) from last_exc
+                time.sleep(2 ** attempt + random.random())
         return ""
 
     @staticmethod
@@ -393,6 +396,7 @@ class CohereChatProvider(ChatProvider):
                     raise ProviderError(
                         f"Cohere chat failed after retries: {last_exc}"
                     ) from last_exc
+                time.sleep(2 ** attempt + random.random())
         return {}
 
 

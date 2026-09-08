@@ -677,8 +677,12 @@ def build_vault(
 
         except Exception as exc:
             with print_lock:
-                print(f"  FAIL {doc.name}: {exc}", file=sys.stderr)
-            return {"source": doc.name, "slug": None, "error": str(exc)}
+                print(f"  FAIL {doc.name}: {exc!r}", file=sys.stderr)
+            # `str(exc)` is empty for some SDK exceptions (e.g. a 429/5xx with an
+            # empty body) — always surface the type and a repr so the failure is
+            # diagnosable instead of a blank message.
+            message = str(exc) or repr(exc)
+            return {"source": doc.name, "slug": None, "error": message}
 
     def record(result: dict) -> None:
         nonlocal completed

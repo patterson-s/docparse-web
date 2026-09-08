@@ -27,6 +27,9 @@ class _ClientV2:
         self.api_key = api_key
         _ClientV2.instances.append(self)
 
+    def parse(self, **kwargs):
+        raise NotImplementedError
+
 
 @pytest.fixture(autouse=True)
 def fake_cohere(monkeypatch):
@@ -80,3 +83,31 @@ def test_parse_parallel_workers_preserve_order(monkeypatch):
     # Six pages, joined by the separator, in submission order.
     assert len(out.split(cohere_mod._PAGE_SEPARATOR)) == 6
     assert calls and len(calls) == 6
+
+
+def test_parse_retries_with_backoff(monkeypatch):
+    """A failed page must be retried with an increasing delay, not in a tight loop."""
+    import time as _time
+    import docparse.providers.cohere as cohere_mod
+
+    calls = []
+    sleeps = []
+    monkeypatch.setattr(_time, "sleep", lambda s: sleeps.append(s))
+
+    def boom(self, **kwargs):
+        calls.append(kwargs)
+        raise RuntimeError("burst")
+
+    monkeypatch.setattr(_ClientV2, "parse", boom)
+    monkeypatch.setattr(
+        cohere_mod, "_render_pdf_pages", lambda b, dpi: [b"png"]
+    )
+    from docparse.providers import ProviderError
+
+    provider = CohereParseOcrProvider(api_key="k")
+    with pytest.raises(ProviderError):
+        provider.extract(DocumentSource.from_bytes(b"pdf", "doc.pdf"))
+    # 3 attempts => 2 sleeps, increasing.
+    assert len(calls) == 3
+    assert len(sleeps) == 2
+    assert sleeps[0] < sleeps[1]
