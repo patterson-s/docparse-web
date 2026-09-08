@@ -14,6 +14,7 @@ import pytest
 from docparse.providers import (
     get_chat_provider,
     get_ocr_provider,
+    DocumentSource,
     CohereChatProvider,
     CohereParseOcrProvider,
 )
@@ -54,3 +55,28 @@ def test_parse_is_registered_and_defaults_to_parse_v5():
 
     assert "cohere-parse" in [getattr(x, "name", x) for x in (CohereParseOcrProvider,)]
     assert _PARSE_MODEL == "parse-v5.0"
+
+
+def test_parse_parallel_workers_preserve_order(monkeypatch):
+    """Parallel page requests must return in page order regardless of completion."""
+    import docparse.providers.cohere as cohere_mod
+
+    calls = []
+
+    def fake_parse_page(self, data_uri: str) -> str:
+        # data_uri encodes the page index; return a value keyed to it.
+        calls.append(data_uri)
+        page_no = data_uri[-1]
+        return f"page-content-{page_no}"
+
+    monkeypatch.setattr(CohereParseOcrProvider, "_parse_page", fake_parse_page)
+    monkeypatch.setattr(
+        cohere_mod, "_render_pdf_pages", lambda b, dpi: [f"png-{i}".encode() for i in range(6)]
+    )
+    provider = CohereParseOcrProvider(api_key="k", workers=4)
+
+    out = provider.extract(DocumentSource.from_bytes(b"pdf", "doc.pdf"))
+
+    # Six pages, joined by the separator, in submission order.
+    assert len(out.split(cohere_mod._PAGE_SEPARATOR)) == 6
+    assert calls and len(calls) == 6

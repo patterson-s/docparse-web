@@ -36,3 +36,6 @@ test_*.docx
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local diag / smoke logs
+scripts/*.log

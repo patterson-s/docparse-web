@@ -260,16 +260,27 @@ class CohereParseOcrProvider(OcrProvider):
     Parse accepts only `image_url` documents (one image per call), so a PDF is
     rasterised locally (pypdfium2) and each page is sent as a base64 data URI.
     Per-page markdown is joined with the same separator MistralOcrProvider uses.
+
+    Parse's per-page latency is high (tens of seconds on dense pages), so page
+    requests are run in parallel (`workers`, default 4). Order is preserved in
+    the joined output.
     """
 
     name = "cohere-parse"
 
-    def __init__(self, api_key: str = "", model: str = _PARSE_MODEL, dpi: int = 150):
+    def __init__(
+        self,
+        api_key: str = "",
+        model: str = _PARSE_MODEL,
+        dpi: int = 150,
+        workers: int = 4,
+    ):
         import cohere
 
         self._client = cohere.ClientV2(api_key=api_key)
         self._model = model
         self._dpi = dpi
+        self._workers = max(1, workers)
 
     def extract(self, source: DocumentSource) -> str:
         content = self._resolve_bytes(source)
@@ -283,7 +294,13 @@ class CohereParseOcrProvider(OcrProvider):
         if not pages:
             raise ProviderError(f"No pages rendered from {source.filename!r}")
 
-        texts = [self._parse_page(_data_uri(png)) for png in pages]
+        if len(pages) == 1 or self._workers == 1:
+            texts = [self._parse_page(_data_uri(png)) for png in pages]
+        else:
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=min(self._workers, len(pages))) as ex:
+                texts = list(ex.map(self._parse_page, [_data_uri(p) for p in pages]))
         kept = [t.strip() for t in texts if t and t.strip()]
         return _PAGE_SEPARATOR.join(kept)
 
