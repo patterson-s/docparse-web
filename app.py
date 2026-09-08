@@ -98,11 +98,12 @@ if st.button("Parse documents", type="primary"):
 
     bar = st.progress(0.0, text="Starting…")
 
-    def on_page(done: int, total: int) -> None:
-        bar.progress(done / total, text=f"extracting page {done}/{total}")
-
+    # NOTE: no per-page progress here — page callbacks fire inside the OCR
+    # worker threads, and Streamlit widgets are main-thread-only
+    # (NoSessionContext). Doc-level progress_cb below fires in the main thread
+    # and is safe.
     try:
-        ocr, chat = _cohere_providers(api_key, ocr_progress_cb=on_page)
+        ocr, chat = _cohere_providers(api_key)
     except Exception as exc:  # noqa: BLE001 — surfaced to the user
         st.error(f"Could not initialise Cohere: {exc}")
         st.stop()
