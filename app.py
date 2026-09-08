@@ -21,15 +21,19 @@ import streamlit as st
 st.set_page_config(page_title="docparse · web", page_icon="📄", layout="wide")
 
 CHAT_MODEL = "command-a-03-2025"   # metadata / structure-plan model (command-a)
-PARSE_MODEL_ID = "cohere-parse"    # OCR model registry id (parse-v5.0)
 MAX_FILES = 10
 
 
-def _cohere_providers(api_key: str):
-    """The only two providers the app builds — both Cohere."""
-    from docparse import providers
+def _cohere_providers(api_key: str, ocr_progress_cb=None):
+    """The only two providers the app builds — both Cohere.
 
-    ocr = providers.get_ocr_provider(PARSE_MODEL_ID, api_key=api_key)
+    `ocr_progress_cb(done, total)` fires as each PDF page finishes extraction,
+    so the UI can show page-level progress instead of a frozen spinner.
+    """
+    from docparse import providers
+    from docparse.providers.cohere import CohereParseOcrProvider
+
+    ocr = CohereParseOcrProvider(api_key=api_key, progress_cb=ocr_progress_cb)
     chat = providers.get_chat_provider("cohere", api_key=api_key)
     return ocr, chat
 
@@ -92,13 +96,17 @@ if st.button("Parse documents", type="primary"):
     docs = _save_uploads(uploads, Path(st.session_state.upload_dir))
     output_dir = Path(tempfile.mkdtemp(prefix="docparse_out_"))
 
+    bar = st.progress(0.0, text="Starting…")
+
+    def on_page(done: int, total: int) -> None:
+        bar.progress(done / total, text=f"extracting page {done}/{total}")
+
     try:
-        ocr, chat = _cohere_providers(api_key)
+        ocr, chat = _cohere_providers(api_key, ocr_progress_cb=on_page)
     except Exception as exc:  # noqa: BLE001 — surfaced to the user
         st.error(f"Could not initialise Cohere: {exc}")
         st.stop()
 
-    bar = st.progress(0.0, text="Starting…")
     with st.status(
         f"Parsing {len(docs)} document(s) with Cohere…", expanded=True
     ) as status:

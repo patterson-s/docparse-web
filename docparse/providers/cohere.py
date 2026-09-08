@@ -274,6 +274,7 @@ class CohereParseOcrProvider(OcrProvider):
         model: str = _PARSE_MODEL,
         dpi: int = 150,
         workers: int = 4,
+        progress_cb=None,
     ):
         import cohere
 
@@ -281,6 +282,7 @@ class CohereParseOcrProvider(OcrProvider):
         self._model = model
         self._dpi = dpi
         self._workers = max(1, workers)
+        self._progress_cb = progress_cb
 
     def extract(self, source: DocumentSource) -> str:
         content = self._resolve_bytes(source)
@@ -294,13 +296,27 @@ class CohereParseOcrProvider(OcrProvider):
         if not pages:
             raise ProviderError(f"No pages rendered from {source.filename!r}")
 
-        if len(pages) == 1 or self._workers == 1:
-            texts = [self._parse_page(_data_uri(png)) for png in pages]
+        total = len(pages)
+        done = 0
+        cb = self._progress_cb
+
+        def _track(data_uri: str) -> str:
+            nonlocal done
+            try:
+                text = self._parse_page(data_uri)
+            finally:
+                done += 1
+                if cb is not None:
+                    cb(done, total)
+            return text
+
+        if total == 1 or self._workers == 1:
+            texts = [_track(_data_uri(png)) for png in pages]
         else:
             from concurrent.futures import ThreadPoolExecutor
 
-            with ThreadPoolExecutor(max_workers=min(self._workers, len(pages))) as ex:
-                texts = list(ex.map(self._parse_page, [_data_uri(p) for p in pages]))
+            with ThreadPoolExecutor(max_workers=min(self._workers, total)) as ex:
+                texts = list(ex.map(_track, [_data_uri(p) for p in pages]))
         kept = [t.strip() for t in texts if t and t.strip()]
         return _PAGE_SEPARATOR.join(kept)
 
