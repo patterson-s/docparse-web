@@ -102,8 +102,30 @@ def _render_pdf_pages(pdf_bytes: bytes, dpi: int) -> list[bytes]:
     return pages
 
 
-def _data_uri(png_bytes: bytes) -> str:
-    return "data:image/png;base64," + base64.b64encode(png_bytes).decode("ascii")
+_MIME_DEFAULT = "image/png"
+
+
+def _sniff_mime(image_bytes: bytes) -> str:
+    """Infer an image's MIME type from its magic bytes.
+
+    Pages rasterised from a PDF are always PNG; an uploaded standalone image
+    keeps its own format (JPEG/PNG/GIF/WebP). Label the data URI correctly so
+    Cohere Parse/vision don't reject or mis-decode a non-PNG upload.
+    """
+    if image_bytes.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if image_bytes.startswith(b"\x89PNG"):
+        return "image/png"
+    if image_bytes.startswith(b"GIF8"):
+        return "image/gif"
+    if image_bytes.startswith(b"RIFF") and image_bytes[8:12] == b"WEBP":
+        return "image/webp"
+    return _MIME_DEFAULT
+
+
+def _data_uri(image_bytes: bytes) -> str:
+    mime = _sniff_mime(image_bytes)
+    return f"data:{mime};base64," + base64.b64encode(image_bytes).decode("ascii")
 
 
 def _join_parse_pages(response) -> str:

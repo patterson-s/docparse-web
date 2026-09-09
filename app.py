@@ -1,6 +1,6 @@
 """Cohere-only docparse for the web.
 
-Upload PDF/DOCX/MD/TXT, supply your own Cohere API key, and download a zip of the
+Upload PDF/DOCX/MD/TXT/image, supply your own Cohere API key, and download a zip of the
 parsed entries — one folder per document in the SciDiplo "source library" layout:
 
     <Slug>/  <Slug>.md  abstract.md  body.md  references.md  bibliographic.md  notes/
@@ -58,7 +58,7 @@ def _zip_vault(vault_dir: Path) -> bytes:
 
 st.title("📄 docparse · web")
 st.caption(
-    "PDF / DOCX / MD → structured Markdown. Your own Cohere key; "
+    "PDF / DOCX / MD / images → structured Markdown. Your own Cohere key; "
     "nothing is stored server-side."
 )
 
@@ -73,7 +73,7 @@ if "upload_dir" not in st.session_state:
 
 uploads = st.file_uploader(
     "Drag and drop documents here",
-    type=["pdf", "docx", "md", "txt"],
+    type=["pdf", "docx", "md", "txt", "png", "jpg", "jpeg", "webp", "gif"],
     accept_multiple_files=True,
 )
 if uploads and len(uploads) > MAX_FILES:

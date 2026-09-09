@@ -1,7 +1,8 @@
 # docparse · web
 
 Cohere-only web version of [docparse](https://github.com/patterson-s/docparse).
-Upload PDF / DOCX / MD / TXT, supply **your own** Cohere API key, and download a
+Upload PDF / DOCX / MD / TXT / images (PNG, JPEG, WebP, GIF), supply **your own**
+Cohere API key, and download a
 zip of the parsed entries — one folder per document in the SciDiplo "source
 library" layout:
 

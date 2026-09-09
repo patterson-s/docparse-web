@@ -11,6 +11,10 @@ from pathlib import Path
 
 from ..providers import get_ocr_provider, DocumentSource
 
+# Standalone images a provider's OCR can transcribe directly (as a single image),
+# without a local rasterisation step like PDFs need.
+_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+
 
 def read(
     path: str | Path,
@@ -22,11 +26,13 @@ def read(
 
     `ocr_provider` may be an OcrProvider instance or a string id (e.g. "mistral").
     If None, the default Mistral OCR provider is used (key from api_key/env).
+    PDFs and standalone images (PNG/JPEG/GIF/WebP) are handed to the OCR provider;
+    DOCX/MD/TXT are read locally without OCR.
     """
     p = Path(path)
     ext = p.suffix.lower()
 
-    if ext == ".pdf":
+    if ext == ".pdf" or ext in _IMAGE_EXTENSIONS:
         if ocr_provider is None:
             ocr_provider = get_ocr_provider(api_key=api_key)
         elif isinstance(ocr_provider, str):
@@ -44,7 +50,10 @@ def read(
 
         return md_to_markdown(p)
 
-    raise ValueError(f"Unsupported file type: {ext!r}. Supported: .pdf, .docx, .doc, .md, .txt")
+    raise ValueError(
+        f"Unsupported file type: {ext!r}. "
+        "Supported: .pdf, .docx, .doc, .md, .txt, .png, .jpg, .jpeg, .webp, .gif"
+    )
 
 
 def detect_format(path: str | Path) -> str:
@@ -55,4 +64,6 @@ def detect_format(path: str | Path) -> str:
         return "docx"
     if ext in {".md", ".txt"}:
         return "md"
+    if ext in _IMAGE_EXTENSIONS:
+        return "image"
     return "unknown"

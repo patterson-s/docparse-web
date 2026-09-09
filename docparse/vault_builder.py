@@ -533,7 +533,10 @@ def save_progress(output_dir: Path, done: set[str]) -> None:
 # Everything readers.read can handle. `.doc` is deliberately excluded: the
 # reader claims it, but python-docx cannot open the legacy binary format, so it
 # would fail deep inside the pipeline instead of being reported up front.
-SUPPORTED_SUFFIXES = (".pdf", ".docx", ".md", ".txt")
+SUPPORTED_SUFFIXES = (
+    ".pdf", ".docx", ".md", ".txt",
+    ".png", ".jpg", ".jpeg", ".webp", ".gif",
+)
 
 
 def collect_inputs(path: Path, recursive: bool = False) -> list[Path]:

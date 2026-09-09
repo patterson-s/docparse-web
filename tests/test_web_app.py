@@ -70,3 +70,13 @@ def test_has_document_uploader(app):
     assert any("Drag and drop" in u.label for u in at.file_uploader)
     # Accepts multiple files (the batch entry point needs a list).
     assert at.file_uploader[0].proto.multiple_files is True
+
+
+def test_uploader_accepts_image_formats(app):
+    """JPEG (and siblings) must be draggable — the reported bug was the uploader
+    rejecting image/jpeg client-side before OCR ever ran."""
+    at = app()
+    assert not at.exception, at.exception
+    types = list(at.file_uploader[0].proto.type)
+    for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+        assert ext in types, f"uploader missing accepted type {ext}"
