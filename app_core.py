@@ -16,6 +16,40 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+# Chat/metadata model per OCR vendor (academic mode only).
+COHERE_CHAT_MODEL = "command-a-03-2025"
+MISTRAL_CHAT_MODEL = "mistral-medium-latest"
+
+# OCR-engine selector options shown by the app (Cohere is the default).
+ENGINE_OPTIONS = ["Cohere (default)", "Mistral"]
+
+
+def engine(engine_label: str) -> dict:
+    """Registry ids + metadata chat model for a vendor label.
+
+    The metadata/structure chat follows the OCR choice so each vendor is
+    self-contained (Cohere Parse + command-a, or Mistral OCR + mistral-medium).
+    """
+    if engine_label == "Mistral":
+        return {
+            "ocr": "mistral",
+            "chat": "mistral",
+            "chat_model": MISTRAL_CHAT_MODEL,
+            "vendor": "Mistral",
+            "key_label": "Your Mistral API key",
+            "key_help": "Get one at https://console.mistral.ai/api-keys/. "
+                        "Sent only to Mistral.",
+        }
+    return {
+        "ocr": "cohere-parse",
+        "chat": "cohere",
+        "chat_model": COHERE_CHAT_MODEL,
+        "vendor": "Cohere",
+        "key_label": "Your Cohere API key",
+        "key_help": "Get one at https://dashboard.cohere.com/api-keys. "
+                    "Sent only to Cohere.",
+    }
+
 
 def _unique_name(stem: str, used: set[str]) -> str:
     """Return `stem` if free, else `stem_2`, `stem_3`, … (deterministic)."""

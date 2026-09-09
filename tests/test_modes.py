@@ -125,7 +125,7 @@ def app(monkeypatch):
 def test_output_modes_default_to_academic(app):
     at = app()
     assert not at.exception, at.exception
-    assert len(at.radio) == 2  # Output format + Add documents
+    assert len(at.radio) == 3  # OCR engine + Output format + Add documents
     labels = [r.options for r in at.radio]
     assert any("Academic article" in opts for opts in labels)
     assert any("Free form (.md)" in opts for opts in labels)

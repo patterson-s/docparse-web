@@ -1,9 +1,21 @@
 # docparse · web
 
-Cohere-only web version of [docparse](https://github.com/patterson-s/docparse).
+Web version of [docparse](https://github.com/patterson-s/docparse).
 Upload PDF / DOCX / MD / TXT / images (PNG, JPEG, WebP, GIF) — picked
 individually or as a **whole folder** (recursively filtered to supported
-types) — supply **your own** Cohere API key, and download a zip of the output.
+types) — supply your own API key for the OCR engine you choose, and download a
+zip of the output.
+
+## Two OCR engines (bring your own key)
+
+- **Cohere (default):** Cohere Parse (`parse-v5.0`) — `CohereParseOcrProvider`.
+  PDFs are rasterised locally (pypdfium2) and each page sent as an image to
+  Parse; standalone images go straight to Parse.
+- **Mistral:** Mistral OCR (`mistral-ocr-latest`) — `MistralOcrProvider`.
+  Files are uploaded to Mistral, OCR'd via a signed URL, then deleted.
+
+The key field follows your engine choice; each is sent only to its vendor and
+never stored server-side.
 
 ## Two output modes
 
@@ -16,27 +28,22 @@ types) — supply **your own** Cohere API key, and download a zip of the output.
 
   The output is byte-compatible with the folders in
   `SciDiplo_AIGOV/source/` (e.g. `AlapietilaSmuha_2021_FrameworkGlobalCooperation/`).
+  The metadata step uses the SAME vendor's chat model as the OCR engine:
+  Cohere `command-a-03-2025`, or Mistral `mistral-medium-latest`.
 
 - **Free form (.md)**: OCR/read each input to ONE plain `<source>.md` — no
   metadata step, no abstract/body/references split. Outputs are flattened; a
   basename collision gets a `_2` suffix.
 
-## What it uses (and only what it uses)
-
-- **Extraction:** Cohere Parse (`parse-v5.0`) — `docparse/providers/cohere.py`,
-  `CohereParseOcrProvider`. PDFs are rasterised locally (pypdfium2) and each page
-  sent as an image to Parse; standalone images go straight to Parse.
-- **Metadata / structure (academic mode only):** Cohere `command-a-03-2025` —
-  `CohereChatProvider`.
-
-No provider selector, no model selector. Two Cohere models, that's it.
+No model selector and no selectable chat engine: OCR vendor fixes the metadata
+chat, and each vendor's model is fixed. That's it.
 
 ## Security
 
 The API key is entered in the browser and **never stored server-side**. It lives
-only in this request's in-process Cohere clients, is sent only to Cohere, and is
-never written to disk, logs, or environment. No server-side key exists — every
-user brings their own and is billed by Cohere directly.
+only in this request's in-process provider clients, is sent only to the chosen
+vendor, and is never written to disk, logs, or environment. No server-side key
+exists — every user brings their own and is billed by that vendor directly.
 
 ## Local development
 
@@ -44,7 +51,7 @@ user brings their own and is billed by Cohere directly.
 python -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt
 .venv/Scripts/python -m pip install pytest          # dev-only, not in requirements
-.venv/Scripts/python -m pytest tests/ -q            # 25 tests, no network
+.venv/Scripts/python -m pytest tests/ -q            # 30 tests, no network
 .venv/Scripts/python -m streamlit run app.py        # http://localhost:8501
 ```
 

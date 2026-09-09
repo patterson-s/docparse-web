@@ -1,23 +1,25 @@
-"""docparse web app — Cohere-only.
+"""docparse web app.
 
 Upload PDF / DOCX / MD / TXT / images (or a whole folder of them), supply your
-own Cohere API key, and download a zip of the parsed output.
+own API key for the OCR engine you pick, and download a zip of the parsed output.
+
+Two OCR engines (bring your own key for the one you choose):
+- Cohere (default): Cohere Parse (parse-v5.0) extraction.
+- Mistral: Mistral OCR (mistral-ocr-latest).
 
 Two output modes:
 - Academic article (default): the SciDiplo "source library" layout — a folder
   per document with <Slug>.md, abstract.md, body.md, references.md,
-  bibliographic.md, notes/ (Cohere Parse extraction + command-a metadata).
+  bibliographic.md, notes/. The metadata/structure chat uses the SAME vendor as
+  the OCR engine: Cohere command-a-03-2025, or Mistral mistral-medium-latest.
 - Free form (.md): OCR/read each input to ONE plain <source>.md — no metadata,
   no abstract/body/references split, no chat call.
 
 Inputs may be picked one-by-one/many-at-once, or as an entire folder
 (recursively; only supported types are taken).
 
-Fixed pipeline for academic mode: Cohere Parse (parse-v5.0) for extraction,
-command-a-03-2025 for metadata. No provider/model selector.
-
-The API key is never stored server-side; it lives only in this request's
-in-process Cohere clients and is sent only to Cohere.
+API keys are never stored server-side; they live only in this request's
+in-process clients and are sent only to the chosen vendor.
 """
 from __future__ import annotations
 
@@ -26,9 +28,10 @@ from pathlib import Path
 
 import streamlit as st
 
+from app_core import ENGINE_OPTIONS, engine
+
 st.set_page_config(page_title="docparse · web", page_icon="📄", layout="wide")
 
-CHAT_MODEL = "command-a-03-2025"   # metadata / structure-plan model (command-a)
 MAX_FILES = 100
 
 # Formats the uploader accepts. When a whole folder is dropped, only files
@@ -38,21 +41,6 @@ SUPPORTED_TYPES = ["pdf", "docx", "md", "txt", "png", "jpg", "jpeg", "webp", "gi
 
 OUTPUT_MODES = ["Academic article", "Free form (.md)"]
 INPUT_MODES = ["Individual files", "A folder"]
-
-
-def _ocr_provider(api_key: str):
-    from docparse.providers.cohere import CohereParseOcrProvider
-
-    return CohereParseOcrProvider(api_key=api_key)
-
-
-def _providers(api_key: str):
-    """OCR + chat providers for academic mode (chat = metadata model)."""
-    from docparse import providers
-
-    ocr = _ocr_provider(api_key)
-    chat = providers.get_chat_provider("cohere", api_key=api_key)
-    return ocr, chat
 
 
 def _save_uploads(uploads, dest: Path) -> list[Path]:
@@ -81,15 +69,27 @@ def _zip_vault(vault_dir: Path) -> bytes:
 
 st.title("📄 docparse · web")
 st.caption(
-    "PDF / DOCX / MD / images → structured Markdown. Your own Cohere key; "
-    "nothing is stored server-side."
+    "PDF / DOCX / MD / images → structured Markdown. Your own key for your "
+    "chosen OCR engine; nothing is stored server-side."
 )
 
-api_key = st.text_input(
-    "Your Cohere API key",
-    type="password",
-    help="Get one at https://dashboard.cohere.com/api-keys. Sent only to Cohere.",
+engine_label = st.radio(
+    "OCR engine", ENGINE_OPTIONS, index=0, horizontal=True,
+    help="Cohere Parse (default) or Mistral OCR. In academic mode the metadata "
+         "step uses the same vendor's chat model.",
 )
+
+# A single key field for the active engine (each engine keeps its own value
+# across switches). Only the chosen engine's field is rendered.
+eng = engine(engine_label)
+if engine_label == "Mistral":
+    api_key = st.text_input(
+        eng["key_label"], type="password", key="mistral_api_key", help=eng["key_help"]
+    )
+else:
+    api_key = st.text_input(
+        eng["key_label"], type="password", key="cohere_api_key", help=eng["key_help"]
+    )
 
 mode = st.radio("Output format", OUTPUT_MODES, index=0, horizontal=True,
                 help="Academic = folder per doc with abstract/body/references split "
@@ -126,7 +126,7 @@ if st.button("Parse documents", type="primary"):
     if not uploads:
         problems.append("Add at least one document — drag files in above.")
     if not api_key:
-        problems.append("Enter your Cohere API key above.")
+        problems.append(f"Enter your {eng['vendor']} API key above.")
     if problems:
         for p in problems:
             st.warning(p)
@@ -139,20 +139,22 @@ if st.button("Parse documents", type="primary"):
 
     bar = st.progress(0.0, text="Starting…")
 
+    from docparse import providers
+
     try:
+        ocr = providers.get_ocr_provider(eng["ocr"], api_key=api_key)
         if is_freeform:
-            ocr = _ocr_provider(api_key)
+            chat = None
+            chat_model = None
         else:
-            ocr, chat = _providers(api_key)
+            chat = providers.get_chat_provider(eng["chat"], api_key=api_key)
+            chat_model = eng["chat_model"]
     except Exception as exc:  # noqa: BLE001 — surfaced to the user
-        st.error(f"Could not initialise Cohere: {exc}")
+        st.error(f"Could not initialise {eng['vendor']}: {exc}")
         st.stop()
 
-    label = (
-        f"Transcribing {len(docs)} document(s) with Cohere…"
-        if is_freeform else
-        f"Parsing {len(docs)} document(s) with Cohere…"
-    )
+    verb = "Transcribing" if is_freeform else "Parsing"
+    label = f"{verb} {len(docs)} document(s) with {eng['vendor']}…"
     with st.status(label, expanded=True) as status:
         try:
             if is_freeform:
@@ -174,7 +176,7 @@ if st.button("Parse documents", type="primary"):
                     input_dir=Path(st.session_state.upload_dir),
                     output_dir=output_dir,
                     api_key=api_key,
-                    model=CHAT_MODEL,
+                    model=chat_model,
                     ocr_provider=ocr,
                     chat_provider=chat,
                     files=docs,

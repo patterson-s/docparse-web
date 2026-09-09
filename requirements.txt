@@ -1,5 +1,7 @@
 cohere>=7.1.0
-mistralai>=1.0.0
+# Vendored mistral.py does `from mistralai import Mistral`, which moved to
+# mistralai.client in v2 — pin to the 1.x line (matches the desktop docparse).
+mistralai==1.12.4
 streamlit==1.57.0
 pypdfium2>=4.30.0
 pillow>=10.0.0
