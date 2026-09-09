@@ -36,9 +36,15 @@ def app(monkeypatch):
 def test_no_provider_or_model_selector(app):
     at = app()
     assert not at.exception, at.exception
-    # No provider radio, no OCR-method radio, no model selectbox.
-    assert len(at.radio) == 0
+    # No provider/OCR-method/model selector widgets.
     assert len(at.selectbox) == 0
+    # The two radios are format/input selectors, not model pickers.
+    for r in at.radio:
+        for opt in r.options:
+            assert not any(
+                tok in opt.lower()
+                for tok in ("model", "command-a", "parse-v", "provider", "mistral")
+            )
     # Exactly one API-key field, labelled Cohere.
     fields = [w for w in at.text_input if "API key" in w.label]
     assert len(fields) == 1

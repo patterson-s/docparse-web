@@ -1,24 +1,33 @@
 # docparse · web
 
 Cohere-only web version of [docparse](https://github.com/patterson-s/docparse).
-Upload PDF / DOCX / MD / TXT / images (PNG, JPEG, WebP, GIF), supply **your own**
-Cohere API key, and download a
-zip of the parsed entries — one folder per document in the SciDiplo "source
-library" layout:
+Upload PDF / DOCX / MD / TXT / images (PNG, JPEG, WebP, GIF) — picked
+individually or as a **whole folder** (recursively filtered to supported
+types) — supply **your own** Cohere API key, and download a zip of the output.
 
-```
-<Slug>/  <Slug>.md  abstract.md  body.md  references.md  bibliographic.md  notes/
-```
+## Two output modes
 
-The output is byte-compatible with the folders in
-`SciDiplo_AIGOV/source/` (e.g. `AlapietilaSmuha_2021_FrameworkGlobalCooperation/`).
+- **Academic article** (default): a folder per document in the SciDiplo "source
+  library" layout —
+
+  ```
+  <Slug>/  <Slug>.md  abstract.md  body.md  references.md  bibliographic.md  notes/
+  ```
+
+  The output is byte-compatible with the folders in
+  `SciDiplo_AIGOV/source/` (e.g. `AlapietilaSmuha_2021_FrameworkGlobalCooperation/`).
+
+- **Free form (.md)**: OCR/read each input to ONE plain `<source>.md` — no
+  metadata step, no abstract/body/references split. Outputs are flattened; a
+  basename collision gets a `_2` suffix.
 
 ## What it uses (and only what it uses)
 
 - **Extraction:** Cohere Parse (`parse-v5.0`) — `docparse/providers/cohere.py`,
   `CohereParseOcrProvider`. PDFs are rasterised locally (pypdfium2) and each page
-  sent as an image to Parse.
-- **Metadata / structure:** Cohere `command-a-03-2025` — `CohereChatProvider`.
+  sent as an image to Parse; standalone images go straight to Parse.
+- **Metadata / structure (academic mode only):** Cohere `command-a-03-2025` —
+  `CohereChatProvider`.
 
 No provider selector, no model selector. Two Cohere models, that's it.
 
@@ -35,7 +44,7 @@ user brings their own and is billed by Cohere directly.
 python -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt
 .venv/Scripts/python -m pip install pytest          # dev-only, not in requirements
-.venv/Scripts/python -m pytest tests/ -q            # 7 tests, no network
+.venv/Scripts/python -m pytest tests/ -q            # 25 tests, no network
 .venv/Scripts/python -m streamlit run app.py        # http://localhost:8501
 ```
 
