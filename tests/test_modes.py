@@ -125,7 +125,7 @@ def app(monkeypatch):
 def test_output_modes_default_to_academic(app):
     at = app()
     assert not at.exception, at.exception
-    assert len(at.radio) == 3  # OCR engine + Output format + Add documents
+    assert len(at.radio) == 2  # OCR engine + Output format (no input toggle)
     labels = [r.options for r in at.radio]
     assert any("Academic article" in opts for opts in labels)
     assert any("Free form (.md)" in opts for opts in labels)
@@ -134,12 +134,49 @@ def test_output_modes_default_to_academic(app):
     assert out_radio.value == "Academic article"
 
 
-def test_folder_mode_sets_directory_uploader(app):
+def test_no_manual_toggle_both_uploaders_offered(app):
+    """The individual-file / folder choice is auto-detected: both widgets are
+    always shown (no radio), so whichever the user fills is used."""
     at = app()
     assert not at.exception, at.exception
-    add_radio = [r for r in at.radio if "Individual files" in r.options][0]
-    add_radio.set_value("A folder").run()
-    assert not at.exception, at.exception
-    # Exactly one uploader is rendered and it accepts a whole directory.
-    assert len(at.file_uploader) == 1
-    assert at.file_uploader[0].proto.accept_directory is True
+    # No 'Add documents' radio toggling a single widget.
+    assert not any("Individual files" in r.options for r in at.radio)
+    assert not any("A folder" in r.options for r in at.radio)
+    # Both uploaders present; one is the folder/directory widget.
+    assert len(at.file_uploader) == 2
+    assert any(u.proto.accept_directory for u in at.file_uploader)
+
+
+# ── merge_uploads (auto-merge / dedupe across the two widgets) ─────────────
+
+class _FakeUp:
+    """UploadedFile-like stand-in for testing merge_uploads."""
+
+    def __init__(self, name, data):
+        self.name = name
+        self._data = data
+
+    def getvalue(self):
+        return self._data
+
+
+def test_merge_uploads_combines_both_and_dedupes():
+    from app_core import merge_uploads
+
+    a = _FakeUp("a.pdf", b"%PDF-A")
+    b = _FakeUp("b.pdf", b"%PDF-B")
+    folder_a = _FakeUp("a.pdf", b"%PDF-A")  # same name+size as `a`
+    c = _FakeUp("c.pdf", b"%PDF-C")
+
+    merged = merge_uploads([a, b], [folder_a, c])
+
+    names = [m.name for m in merged]
+    assert names == ["a.pdf", "b.pdf", "c.pdf"]  # folder duplicate dropped
+
+
+def test_merge_uploads_tolerates_empty_widgets():
+    from app_core import merge_uploads
+
+    assert merge_uploads(None, None) == []
+    x = _FakeUp("x.md", b"# x")
+    assert [m.name for m in merge_uploads([x], None)] == ["x.md"]

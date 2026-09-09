@@ -28,7 +28,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from app_core import ENGINE_OPTIONS, engine
+from app_core import ENGINE_OPTIONS, engine, merge_uploads
 
 st.set_page_config(page_title="docparse · web", page_icon="📄", layout="wide")
 
@@ -40,7 +40,6 @@ MAX_FILES = 100
 SUPPORTED_TYPES = ["pdf", "docx", "md", "txt", "png", "jpg", "jpeg", "webp", "gif"]
 
 OUTPUT_MODES = ["Academic article", "Free form (.md)"]
-INPUT_MODES = ["Individual files", "A folder"]
 
 
 def _save_uploads(uploads, dest: Path) -> list[Path]:
@@ -95,29 +94,34 @@ mode = st.radio("Output format", OUTPUT_MODES, index=0, horizontal=True,
                 help="Academic = folder per doc with abstract/body/references split "
                      "(uses a metadata step). Free form = one plain .md transcription "
                      "per file, no split, no metadata call.")
-input_style = st.radio("Add documents", INPUT_MODES, index=0, horizontal=True,
-                       help="Pick files individually, or select one folder and have "
-                            "every supported file inside it (recursively) taken.")
-
+# Two always-visible uploaders — files and folder — merged automatically. A
+# single Streamlit uploader is either multi-file OR directory (it can't accept
+# both), so two widgets is what lets a user drop loose files or a whole folder
+# without a toggle; whichever is filled is used.
 if "upload_dir" not in st.session_state:
     st.session_state.upload_dir = tempfile.mkdtemp(prefix="docparse_in_")
 
 _ext = ", ".join(f".{t}" for t in SUPPORTED_TYPES)
-if input_style == "A folder":
-    uploads = st.file_uploader(
-        "Select a folder of documents (all supported files inside, recursively)",
-        type=SUPPORTED_TYPES,
-        accept_multiple_files="directory",
-        help=f"Picks every file matching: {_ext}.",
-    )
-else:
-    uploads = st.file_uploader(
-        "Drag and drop documents here",
+_files_col, _folder_col = st.columns(2)
+with _files_col:
+    file_uploads = st.file_uploader(
+        "Documents — pick or drag files here",
         type=SUPPORTED_TYPES,
         accept_multiple_files=True,
+        key="files",
         help=f"Accepted types: {_ext}.",
     )
-if uploads and len(uploads) > MAX_FILES:
+with _folder_col:
+    folder_uploads = st.file_uploader(
+        "…or a whole folder",
+        type=SUPPORTED_TYPES,
+        accept_multiple_files="directory",
+        key="folder",
+        help=f"Picks every file matching: {_ext}, recursively.",
+    )
+
+uploads = merge_uploads(file_uploads, folder_uploads)
+if len(uploads) > MAX_FILES:
     st.error(f"{len(uploads)} files — the limit is {MAX_FILES} per run.")
     uploads = uploads[:MAX_FILES]
 

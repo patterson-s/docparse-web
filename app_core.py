@@ -51,6 +51,25 @@ def engine(engine_label: str) -> dict:
     }
 
 
+def merge_uploads(*groups) -> list:
+    """Merge uploads from the file and folder widgets, dropping duplicates.
+
+    A file picked individually AND again via a containing folder (or dragged
+    twice) should be parsed once. UploadedFile has no cross-widget identity, so
+    dedupe on (name, byte size). `groups` are the widget return values (None or
+    a list of UploadedFile-like objects with `.name` and `.getvalue()`).
+    """
+    seen: set[tuple] = set()
+    merged: list = []
+    for group in groups:
+        for up in group or []:
+            key = (up.name, len(up.getvalue()))
+            if key not in seen:
+                seen.add(key)
+                merged.append(up)
+    return merged
+
+
 def _unique_name(stem: str, used: set[str]) -> str:
     """Return `stem` if free, else `stem_2`, `stem_3`, … (deterministic)."""
     name = stem

@@ -38,7 +38,7 @@ def test_no_provider_or_model_selector(app):
     assert not at.exception, at.exception
     # No model/provider/method SELECTBOX widgets.
     assert len(at.selectbox) == 0
-    # Three radios: OCR engine, output format, add-documents.
+    # Two radios: OCR engine, output format.
     # None may expose a raw model identifier to the user.
     raw = ("command-a", "parse-v", "ocr-latest", "medium-latest", "cohere-parse")
     for r in at.radio:
@@ -72,19 +72,26 @@ def test_parse_without_input_explains_instead_of_greying_out(app):
     assert any("API key" in w for w in warnings)
 
 
-def test_has_document_uploader(app):
+def test_has_both_uploaders_no_toggle(app):
+    """Loose files and a whole folder are each offered, always visible — no
+    toggle to switch between them."""
     at = app()
     assert not at.exception, at.exception
-    assert any("Drag and drop" in u.label for u in at.file_uploader)
-    # Accepts multiple files (the batch entry point needs a list).
-    assert at.file_uploader[0].proto.multiple_files is True
+    ups = at.file_uploader
+    assert len(ups) == 2
+    # Files widget: multi-file. Folder widget: directory mode.
+    assert any(u.proto.multiple_files is True and not u.proto.accept_directory
+               for u in ups)
+    assert any(u.proto.accept_directory for u in ups)
+    assert any("whole folder" in u.label for u in ups)
 
 
 def test_uploader_accepts_image_formats(app):
-    """JPEG (and siblings) must be draggable — the reported bug was the uploader
-    rejecting image/jpeg client-side before OCR ever ran."""
+    """JPEG (and siblings) must be draggable in BOTH uploaders — the reported
+    bug was the uploader rejecting image/jpeg client-side before OCR ran."""
     at = app()
     assert not at.exception, at.exception
-    types = list(at.file_uploader[0].proto.type)
-    for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
-        assert ext in types, f"uploader missing accepted type {ext}"
+    for up in at.file_uploader:
+        types = list(up.proto.type)
+        for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+            assert ext in types, f"uploader missing accepted type {ext}"
